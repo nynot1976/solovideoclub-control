@@ -132,6 +132,34 @@ function log(accountId, action, detail=""){
   db.prepare("INSERT INTO audit_logs(account_id,action,detail) VALUES(?,?,?)").run(accountId,action,detail);
 }
 
+
+async function probeServer(server){
+  const base = String(server.base_url || "").replace(/\/+$/, "");
+  if(!base) return {online:false,error:"URL no configurada"};
+  const headers = {};
+  if(server.api_key){
+    headers["X-Emby-Token"] = server.api_key;
+    headers["X-MediaBrowser-Token"] = server.api_key;
+  }
+  for(const url of [`${base}/System/Info/Public`,`${base}/emby/System/Info/Public`]){
+    try{
+      const controller = new AbortController();
+      const timer = setTimeout(()=>controller.abort(),4500);
+      const response = await fetch(url,{headers,signal:controller.signal});
+      clearTimeout(timer);
+      if(!response.ok) continue;
+      const info = await response.json();
+      return {
+        online:true,
+        server_name:info.ServerName || server.name,
+        version:info.Version || "desconocida",
+        product:info.ProductName || server.type
+      };
+    }catch(e){}
+  }
+  return {online:false,error:"No responde"};
+}
+
 app.post("/api/login",(req,res)=>{
   const {username,password} = req.body || {};
   const account = db.prepare("SELECT * FROM accounts WHERE username=? AND active=1").get(username);
@@ -155,7 +183,19 @@ app.get("/api/me",auth,(req,res)=>{
   res.json(account);
 });
 
-app.get("/api/dashboard",auth,(req,res)=>{
+app.post("/api/change-password",auth,(req,res)=>{
+  const {current_password,new_password}=req.body||{};
+  const account=db.prepare("SELECT * FROM accounts WHERE id=?").get(req.account.id);
+  if(!account || !bcrypt.compareSync(current_password||"",account.password_hash))
+    return res.status(400).json({error:"Contraseña actual incorrecta"});
+  if(String(new_password||"").length<8)
+    return res.status(400).json({error:"La nueva contraseña debe tener 8 caracteres como mínimo"});
+  db.prepare("UPDATE accounts SET password_hash=? WHERE id=?").run(bcrypt.hashSync(new_password,10),req.account.id);
+  log(req.account.id,"change_password");
+  res.json({ok:true});
+});
+
+app.get("/api/dashboard",auth,async(req,res)=>{
   const filter = req.account.role === "reseller" ? "WHERE reseller_id = ?" : "";
   const params = req.account.role === "reseller" ? [req.account.id] : [];
   const totals = db.prepare(`
@@ -170,7 +210,13 @@ app.get("/api/dashboard",auth,(req,res)=>{
     FROM media_users ${filter}
   `).get(...params);
   const recent = db.prepare(`SELECT * FROM media_users ${filter} ORDER BY id DESC LIMIT 6`).all(...params);
-  res.json({totals,recent});
+  const server_statuses = [];
+  if(req.account.role === "admin"){
+    for(const s of db.prepare("SELECT * FROM servers WHERE active=1 ORDER BY id").all()){
+      server_statuses.push({id:s.id,name:s.name,type:s.type,...await probeServer(s)});
+    }
+  }
+  res.json({totals,recent,server_statuses});
 });
 
 app.get("/api/users",auth,(req,res)=>{
@@ -277,6 +323,16 @@ app.post("/api/resellers",auth,adminOnly,(req,res)=>{
 app.get("/api/servers",auth,adminOnly,(req,res)=>{
   const rows=db.prepare("SELECT id,name,type,base_url,active,created_at,CASE WHEN api_key<>'' THEN 1 ELSE 0 END AS configured FROM servers ORDER BY id").all();
   res.json(rows);
+});
+app.get("/api/servers/:id",auth,adminOnly,(req,res)=>{
+  const row=db.prepare("SELECT id,name,type,base_url,api_key,active FROM servers WHERE id=?").get(Number(req.params.id));
+  if(!row) return res.status(404).json({error:"Servidor no encontrado"});
+  res.json(row);
+});
+app.post("/api/servers/:id/test",auth,adminOnly,async(req,res)=>{
+  const row=db.prepare("SELECT * FROM servers WHERE id=?").get(Number(req.params.id));
+  if(!row) return res.status(404).json({error:"Servidor no encontrado"});
+  res.json(await probeServer(row));
 });
 
 app.put("/api/servers/:id",auth,adminOnly,(req,res)=>{

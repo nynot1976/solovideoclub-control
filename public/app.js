@@ -57,6 +57,7 @@ async function loadDashboard(){
     ["Suspendidos",t.suspended||0,"Acceso bloqueado"]
   ].map(x=>`<article class="stat"><small>${x[0]}</small><strong>${x[1]}</strong><em>${x[2]}</em></article>`).join("");
   $("#recentUsers").innerHTML=d.recent.map(card).join("")||"<p>No hay usuarios.</p>";
+  $("#systemStatus").innerHTML=(d.server_statuses||[]).map(s=>`<div class="system-row"><span><b>${s.name}</b><br><small>${s.type.toUpperCase()} · ${s.version||s.error}</small></span><b class="${s.online?"online":"offline"}">${s.online?"Online":"Offline"}</b></div>`).join("")+`<div class="system-row"><span>Base de datos</span><b class="online">Online</b></div><div class="system-row"><span>API del panel</span><b class="online">Online</b></div>`;
 }
 function card(u){
  return `<article class="user-card"><h3>${u.name}</h3><p>${u.email||u.username}</p><div class="chips"><span class="chip ${statusClass[u.status]}">${statusLabel[u.status]}</span><span class="chip">${u.plan}</span></div><dl><div><dt>Servicio</dt><dd>${serviceLabel[u.server_type]}</dd></div><div><dt>Caduca</dt><dd>${u.expires_at||"Sin fecha"}</dd></div></dl></article>`;
@@ -117,11 +118,37 @@ $("#resellerForm").onsubmit=async e=>{
 
 async function loadServers(){
  servers=await api("/api/servers");
- $("#serversCards").innerHTML=servers.map(s=>`<article class="server-card"><h3>${s.type==="emby"?"◆":"△"} ${s.name}</h3><p>${s.base_url}</p><div class="system-row"><span>API configurada</span><b class="${s.configured?"online":""}">${s.configured?"Sí":"Pendiente"}</b></div><div class="system-row"><span>Estado</span><b class="online">${s.active?"Activo":"Desactivado"}</b></div></article>`).join("");
+ $("#serversCards").innerHTML=servers.map(s=>`<article class="server-card"><h3>${s.type==="emby"?"◆":"△"} ${s.name}</h3><p>${s.base_url}</p><div class="system-row"><span>API configurada</span><b class="${s.configured?"online":"pending"}">${s.configured?"Sí":"Pendiente"}</b></div><div class="system-row"><span>Estado</span><b class="${s.active?"online":"offline"}">${s.active?"Activo":"Desactivado"}</b></div><div class="server-actions"><button onclick="editServer(${s.id})">Configurar</button><button onclick="testServer(${s.id},this)">Probar</button></div></article>`).join("");
 }
 async function loadLogs(){
  const rows=await api("/api/logs");
  $("#logsTable").innerHTML=`<table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.created_at}</td><td>${r.display_name||"Sistema"}</td><td>${r.action}</td><td>${r.detail}</td></tr>`).join("")}</tbody></table>`;
 }
+
+window.editServer=async id=>{
+ const s=await api("/api/servers/"+id),f=$("#serverForm");
+ f.id.value=s.id;f.name.value=s.name;f.base_url.value=s.base_url;f.api_key.value=s.api_key||"";f.active.checked=!!s.active;
+ $("#serverModal").classList.remove("hidden");
+};
+window.testServer=async(id,b)=>{
+ const old=b.textContent;b.textContent="Probando...";b.disabled=true;
+ try{const r=await api(`/api/servers/${id}/test`,{method:"POST"});alert(r.online?`Conexión correcta\n${r.server_name}\nVersión ${r.version}`:`No conecta: ${r.error}`)}
+ catch(e){alert(e.message)}finally{b.textContent=old;b.disabled=false}
+};
+$("#closeServerModal").onclick=$("#cancelServerModal").onclick=()=>$("#serverModal").classList.add("hidden");
+$("#serverForm").onsubmit=async e=>{
+ e.preventDefault();const o=Object.fromEntries(new FormData(e.target)),id=o.id;delete o.id;o.active=e.target.active.checked;
+ await api("/api/servers/"+id,{method:"PUT",body:JSON.stringify(o)});
+ $("#serverModal").classList.add("hidden");toast("Servidor actualizado");loadServers();loadDashboard();
+};
+$("#changePassword").onclick=()=>$("#passwordModal").classList.remove("hidden");
+$("#closePasswordModal").onclick=$("#cancelPasswordModal").onclick=()=>$("#passwordModal").classList.add("hidden");
+$("#passwordForm").onsubmit=async e=>{
+ e.preventDefault();const o=Object.fromEntries(new FormData(e.target));
+ if(o.new_password!==o.confirm_password)return alert("Las contraseñas no coinciden");
+ delete o.confirm_password;await api("/api/change-password",{method:"POST",body:JSON.stringify(o)});
+ $("#passwordModal").classList.add("hidden");e.target.reset();toast("Contraseña actualizada");
+};
+
 $("#globalSearch").onkeydown=e=>{if(e.key==="Enter"){go("users");$("#searchUsers").value=e.target.value;renderUsers()}};
 boot();
