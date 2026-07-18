@@ -38,7 +38,7 @@ jobs:
           context: .
           push: true
           tags: |
-            tags: |
             ${{ steps.image.outputs.name }}:latest
             ${{ steps.image.outputs.name }}:v0.3.0
             ${{ steps.image.outputs.name }}:${{ github.sha }}
+           
