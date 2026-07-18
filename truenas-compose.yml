@@ -1,0 +1,12 @@
+services:
+  solovideoclub-control:
+    image: ghcr.io/TU_USUARIO/solovideoclub-control:latest
+    container_name: solovideoclub-control
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: CAMBIA_ESTA_CLAVE_POR_UNA_MUY_LARGA_Y_SEGURA
+    volumes:
+      - /mnt/ank/appdata/solovideoclub-control/data:/app/data

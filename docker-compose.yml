@@ -1,0 +1,12 @@
+services:
+  solovideoclub-control:
+    build: .
+    container_name: solovideoclub-control
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: cambia-esta-clave-larga-y-segura
+    volumes:
+      - ./data:/app/data

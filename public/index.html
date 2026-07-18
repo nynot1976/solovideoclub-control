@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SoloVideoClub Control</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="login" class="login-screen">
+  <form id="loginForm" class="login-card">
+    <div class="logo">▶</div>
+    <h1>SoloVideoClub <span>Control</span></h1>
+    <p>Panel de administración Emby + Jellyfin</p>
+    <label>Usuario<input name="username" value="admin" autocomplete="username"></label>
+    <label>Contraseña<input name="password" type="password" value="Admin123!" autocomplete="current-password"></label>
+    <button>Entrar</button>
+    <small>Demo administrador: admin / Admin123!<br>Demo reseller: reseller1 / Reseller123!</small>
+    <div id="loginError" class="error"></div>
+  </form>
+</div>
+
+<div id="app" class="app hidden">
+  <aside>
+    <div class="brand"><b>▶</b><div><strong>Solo<span>VideoClub</span></strong><small>CONTROL</small></div></div>
+    <nav>
+      <button class="active" data-page="dashboard">⌂ Dashboard</button>
+      <button data-page="users">♙ Usuarios</button>
+      <button data-page="resellers" class="admin-only">♕ Resellers</button>
+      <button data-page="servers" class="admin-only">◆ Servidores</button>
+      <button data-page="logs" class="admin-only">□ Logs</button>
+    </nav>
+    <div class="session"><div id="meName"></div><small id="meRole"></small><button id="logout">Cerrar sesión</button></div>
+  </aside>
+  <main>
+    <header><input id="globalSearch" placeholder="Buscar usuario o email..."><button id="quickNew">＋ Nuevo usuario</button></header>
+
+    <section id="dashboardPage" class="page active">
+      <div class="title"><div><h1>Dashboard</h1><p>Resumen general del servicio.</p></div></div>
+      <div id="stats" class="stats"></div>
+      <div class="grid2">
+        <article class="panel">
+          <div class="panel-title"><h3>Usuarios recientes</h3><button data-go="users">Ver todos</button></div>
+          <div id="recentUsers" class="cards"></div>
+        </article>
+        <article class="panel">
+          <h3>Estado del sistema</h3>
+          <div class="system-row"><span>Emby</span><b class="online">Online</b></div>
+          <div class="system-row"><span>Jellyfin</span><b class="online">Online</b></div>
+          <div class="system-row"><span>Base de datos</span><b class="online">Online</b></div>
+          <div class="system-row"><span>API del panel</span><b class="online">Online</b></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="usersPage" class="page">
+      <div class="title"><div><h1>Usuarios</h1><p>Altas, renovaciones, permisos y suspensiones.</p></div><button id="newUser">＋ Nuevo usuario</button></div>
+      <div class="filters panel">
+        <input id="searchUsers" placeholder="Buscar por nombre, email o usuario">
+        <select id="filterStatus"><option value="">Todos los estados</option><option value="active">Activos</option><option value="expiring">Por vencer</option><option value="suspended">Suspendidos</option><option value="expired">Caducados</option></select>
+        <select id="filterServer"><option value="">Todos los servicios</option><option value="emby">Emby</option><option value="jellyfin">Jellyfin</option><option value="both">Ambos</option></select>
+      </div>
+      <div id="usersTable" class="table-wrap"></div>
+    </section>
+
+    <section id="resellersPage" class="page admin-only">
+      <div class="title"><div><h1>Resellers</h1><p>Cada reseller solo puede ver sus propios clientes.</p></div><button id="newReseller">＋ Nuevo reseller</button></div>
+      <div id="resellersTable" class="table-wrap"></div>
+    </section>
+
+    <section id="serversPage" class="page admin-only">
+      <div class="title"><div><h1>Servidores</h1><p>Configuración de Emby y Jellyfin.</p></div></div>
+      <div id="serversCards" class="cards server-cards"></div>
+    </section>
+
+    <section id="logsPage" class="page admin-only">
+      <div class="title"><div><h1>Logs</h1><p>Registro de actividad del panel.</p></div></div>
+      <div id="logsTable" class="table-wrap"></div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h2 id="modalTitle">Nuevo usuario</h2><button id="closeModal">×</button></div>
+    <form id="userForm">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Nombre<input name="name" required></label>
+        <label>Email<input name="email" type="email"></label>
+        <label>Usuario<input name="username" required></label>
+        <label>Servicio<select name="server_type"><option value="jellyfin">Jellyfin</option><option value="emby">Emby</option><option value="both">Ambos</option></select></label>
+        <label>Servidor<input name="server_name" value="Principal"></label>
+        <label>Plan<select name="plan"><option>Premium</option><option>Básico</option><option>Familiar</option></select></label>
+        <label>Estado<select name="status"><option value="active">Activo</option><option value="expiring">Por vencer</option><option value="suspended">Suspendido</option><option value="expired">Caducado</option></select></label>
+        <label>Caducidad<input name="expires_at" type="date"></label>
+        <label>Dispositivos máximos<input name="max_devices" type="number" min="1" value="2"></label>
+        <label>Streams máximos<input name="max_streams" type="number" min="1" value="1"></label>
+        <label class="wide">Bibliotecas<input name="libraries" placeholder="Películas, Series, Animación"></label>
+        <label class="wide">Notas<textarea name="notes"></textarea></label>
+      </div>
+      <div class="form-actions"><button type="button" class="secondary" id="cancelModal">Cancelar</button><button>Guardar</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="resellerModal" class="modal hidden">
+  <div class="modal-box small">
+    <div class="modal-head"><h2>Nuevo reseller</h2><button id="closeResellerModal">×</button></div>
+    <form id="resellerForm">
+      <label>Nombre visible<input name="display_name" required></label>
+      <label>Usuario<input name="username" required></label>
+      <label>Contraseña<input name="password" type="password" required></label>
+      <label>Créditos iniciales<input name="credits" type="number" value="10"></label>
+      <div class="form-actions"><button type="button" class="secondary" id="cancelResellerModal">Cancelar</button><button>Crear</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/app.js"></script>
+</body></html>
