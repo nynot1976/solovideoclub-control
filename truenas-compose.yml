@@ -1,6 +1,6 @@
 services:
   solovideoclub-control:
-    image: ghcr.io/TU_USUARIO/solovideoclub-control:latest
+    image: ghcr.io/TU_USUARIO/solovideoclub-control:v0.3.0
     container_name: solovideoclub-control
     restart: unless-stopped
     ports:
